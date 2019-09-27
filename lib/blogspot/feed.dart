@@ -27,6 +27,7 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
   static int _fetchCount = 0;
   RefreshController _refreshController =
       RefreshController(initialRefresh: true);
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   String _title;
 
   @override
@@ -49,15 +50,29 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
           onLoading: () => _fetchNext(_nextUrl)
               .then((_) => _refreshController.loadComplete()),
         ),
+        key: _scaffoldKey,
       );
 
   Future<void> _fetchNext(String url, {bool clearEntries = false}) async {
     _fetchCount++;
     debugPrint("[_fetchNext#$_fetchCount] fetching $url");
-    final resp = await http.get(url);
 
+    http.Response resp;
+    try {
+      resp = await http.get(url);
+    } catch (e) {
+      debugPrint("[_fetchNext#$_fetchCount] http exception: $e");
+      return _showSnackbar(e);
+    }
+
+    AtomFeed atomFeed;
     debugPrint("[_fetchNext#$_fetchCount] parsing $url");
-    final atomFeed = AtomFeed.parse(resp.body);
+    try {
+      atomFeed = AtomFeed.parse(resp.body);
+    } catch (e) {
+      debugPrint("[_fetchNext#$_fetchCount] parser exception: $e");
+      return _showSnackbar(e);
+    }
 
     if (!mounted) return;
     setState(() {
@@ -103,6 +118,9 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
       ),
     );
   }
+
+  void _showSnackbar(Exception e) => _scaffoldKey.currentState
+      .showSnackBar(SnackBar(content: Text(e.toString())));
 
   Widget __buildThumbnail(Thumbnail thumbnail) => CachedNetworkImage(
         height: double.tryParse(thumbnail.height),
