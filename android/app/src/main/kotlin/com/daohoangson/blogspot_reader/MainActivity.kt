@@ -1,4 +1,4 @@
-package com.example.blogspot_reader
+package com.daohoangson.blogspot_reader
 
 import android.os.Bundle
 

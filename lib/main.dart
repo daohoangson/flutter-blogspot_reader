@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import 'package:blogspot_reader/blogspot/feed.dart';
+import 'package:blogspot_reader/firebase/firebase.dart';
 
 void main() => runApp(MyApp());
 
@@ -22,6 +24,12 @@ class _Setting extends StatefulWidget {
 
 class _SettingState extends State<_Setting> {
   final _tec = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    configureFcm();
+  }
 
   @override
   void dispose() {

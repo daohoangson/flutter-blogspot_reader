@@ -7,6 +7,7 @@ import 'package:webfeed/webfeed.dart';
 import 'package:webfeed/domain/media/thumbnail.dart';
 
 import 'package:blogspot_reader/blogspot/entry.dart';
+import 'package:blogspot_reader/firebase/firebase.dart';
 
 class BlogspotFeed extends StatefulWidget {
   final String atomFeedUrl;
@@ -22,6 +23,7 @@ class BlogspotFeed extends StatefulWidget {
 }
 
 class _BlogspotFeedState extends State<BlogspotFeed> {
+  String _atomFeedUrlCanonical;
   final _entries = <AtomItem>[];
   String _nextUrl;
   static int _fetchCount = 0;
@@ -36,6 +38,14 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
           title: Text(
             widget.title ?? _title ?? Uri.parse(widget.atomFeedUrl).host,
           ),
+          actions: <Widget>[
+            _atomFeedUrlCanonical != null
+                ? SubscribeButton(
+                    hubTopic: _atomFeedUrlCanonical,
+                    icon: Icons.favorite,
+                  )
+                : SizedBox.shrink(),
+          ],
         ),
         body: SmartRefresher(
           child: ListView.builder(
@@ -55,48 +65,58 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
 
   Future<void> _fetchNext(String url, {bool clearEntries = false}) async {
     _fetchCount++;
-    debugPrint("[_fetchNext#$_fetchCount] fetching $url");
+    final debugTag = "_fetchNext#$_fetchCount";
+    debugPrint("[$debugTag] fetching $url");
 
     http.Response resp;
     try {
       resp = await http.get(url);
     } catch (e) {
-      debugPrint("[_fetchNext#$_fetchCount] http exception: $e");
+      debugPrint("[$debugTag] http exception: $e");
       return _showSnackbar(e);
     }
 
     AtomFeed atomFeed;
-    debugPrint("[_fetchNext#$_fetchCount] parsing $url");
+    debugPrint("[$debugTag] parsing $url");
     try {
       atomFeed = AtomFeed.parse(resp.body);
     } catch (e) {
-      debugPrint("[_fetchNext#$_fetchCount] parser exception: $e");
+      debugPrint("[$debugTag] parser exception: $e");
       return _showSnackbar(e);
+    }
+
+    String altUrl, nextUrl, googleFeedUrl;
+    for (final link in atomFeed.links) {
+      switch (link.rel) {
+        case 'alternate':
+          altUrl = "https://${Uri.parse(link.href).host}/feeds/posts/default";
+          break;
+        case 'http://schemas.google.com/g/2005#feed':
+          googleFeedUrl = link.href;
+          break;
+        case 'next':
+          nextUrl = link.href;
+
+          // workaround for blogspot feed url having duplicated category paths
+          final regExp = new RegExp(r'posts/default((/-/[^/]+){2,})\?');
+          final m = regExp.firstMatch(nextUrl);
+          if (m != null) nextUrl = nextUrl.replaceFirst(m[1], m[2]);
+          break;
+      }
     }
 
     if (!mounted) return;
     setState(() {
-      _nextUrl = null;
-      for (final link in atomFeed.links) {
-        if (link.rel == 'next') _nextUrl = link.href;
-      }
-      debugPrint("[_fetchNext#$_fetchCount] _nextUrl=$_nextUrl");
+      // workaround to get canonical url for https://pubsubhubbub.appspot.com/
+      if (googleFeedUrl != null && googleFeedUrl == altUrl)
+        _atomFeedUrlCanonical = googleFeedUrl;
 
+      _nextUrl = nextUrl;
       _title = atomFeed.title;
-
-      if (_nextUrl != null) {
-        // workaround for blogspot feed url having duplicated category paths
-        final regExp = new RegExp(r'posts/default((/-/[^/]+){2,})\?');
-        final m = regExp.firstMatch(_nextUrl);
-        if (m != null) {
-          _nextUrl = _nextUrl.replaceFirst(m[1], m[2]);
-          debugPrint("[_fetchNext#$_fetchCount] _nextUrl=$_nextUrl");
-        }
-      }
 
       if (clearEntries) _entries.clear();
       _entries.addAll(atomFeed.items);
-      debugPrint("[_fetchNext#$_fetchCount] _entries=${_entries.length}");
+      debugPrint("[$debugTag] _entries=${_entries.length}");
     });
   }
 
