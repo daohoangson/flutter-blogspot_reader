@@ -25,6 +25,9 @@ class BlogspotFeed extends StatefulWidget {
 class _BlogspotFeedState extends State<BlogspotFeed> {
   String _atomFeedUrlCanonical;
   final _entries = <AtomItem>[];
+  bool _gridView = false;
+  double _gridMaxCrossAxisExtent = 200;
+  double _gridSpacing = 5;
   String _nextUrl;
   static int _fetchCount = 0;
   RefreshController _refreshController =
@@ -45,13 +48,27 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
                     icon: Icons.favorite,
                   )
                 : SizedBox.shrink(),
+            IconButton(
+              icon: Icon(_gridView ? Icons.grid_off : Icons.grid_on),
+              onPressed: () => setState(() => _gridView = !_gridView),
+            ),
           ],
         ),
         body: SmartRefresher(
-          child: ListView.builder(
-            itemBuilder: _itemBuilder,
-            itemCount: _entries.length,
-          ),
+          child: _gridView
+              ? GridView.builder(
+                  gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                    mainAxisSpacing: _gridSpacing,
+                    maxCrossAxisExtent: _gridMaxCrossAxisExtent,
+                    crossAxisSpacing: _gridSpacing,
+                  ),
+                  itemBuilder: _itemBuilderForGrid,
+                  itemCount: _entries.length,
+                )
+              : ListView.builder(
+                  itemBuilder: _itemBuilder,
+                  itemCount: _entries.length,
+                ),
           controller: _refreshController,
           enablePullDown: true,
           enablePullUp: _fetchCount == 0 || _nextUrl != null,
@@ -140,6 +157,29 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
     );
   }
 
+  Widget _itemBuilderForGrid(BuildContext context, int index) {
+    final entry = _entries[index];
+
+    final thumbnail = entry.media.thumbnails.isNotEmpty
+        ? __buildThumbnailSquare(
+            entry.media.thumbnails.first, _gridMaxCrossAxisExtent.toInt())
+        : null;
+
+    return GestureDetector(
+      child: thumbnail ??
+          Padding(
+            padding: EdgeInsets.only(left: _gridSpacing),
+            child: Text(
+              entry.title,
+              overflow: TextOverflow.fade,
+              style: Theme.of(context).textTheme.title,
+            ),
+          ),
+      onTap: () => Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => BlogspotEntry(entry))),
+    );
+  }
+
   void _showSnackbar(Exception e) => _scaffoldKey.currentState
       .showSnackBar(SnackBar(content: Text(e.toString())));
 
@@ -148,4 +188,19 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
         imageUrl: thumbnail.url,
         width: double.tryParse(thumbnail.width),
       );
+
+  Widget __buildThumbnailSquare(Thumbnail thumbnail, int size) {
+    final height = int.tryParse(thumbnail.height);
+    final width = int.tryParse(thumbnail.width);
+    if (height == null || width == null || height != width) return null;
+
+    // workaround to generate thumbnail in specified size
+    final sizeUrl = thumbnail.url.replaceAll("s$height-c", "s$size-c");
+    if (sizeUrl == thumbnail.url) return null;
+
+    return AspectRatio(
+      aspectRatio: 1,
+      child: CachedNetworkImage(imageUrl: sizeUrl),
+    );
+  }
 }
