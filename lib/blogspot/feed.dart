@@ -85,14 +85,11 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
       return _showSnackbar(e);
     }
 
-    String altUrl, nextUrl, googleFeedUrl;
+    String altUrl, nextUrl;
     for (final link in atomFeed.links) {
       switch (link.rel) {
         case 'alternate':
-          altUrl = "https://${Uri.parse(link.href).host}/feeds/posts/default";
-          break;
-        case 'http://schemas.google.com/g/2005#feed':
-          googleFeedUrl = link.href;
+          altUrl = link.href;
           break;
         case 'next':
           nextUrl = link.href;
@@ -108,8 +105,12 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
     if (!mounted) return;
     setState(() {
       // workaround to get canonical url for https://pubsubhubbub.appspot.com/
-      if (googleFeedUrl != null && googleFeedUrl == altUrl)
-        _atomFeedUrlCanonical = googleFeedUrl;
+      if (altUrl != null && nextUrl != null) {
+        final altUri = Uri.parse(altUrl);
+        if (altUri.path == '/') {
+          _atomFeedUrlCanonical = "https://${altUri.host}/feeds/posts/default";
+        }
+      }
 
       _nextUrl = nextUrl;
       _title = atomFeed.title;
