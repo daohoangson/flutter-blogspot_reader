@@ -7,9 +7,16 @@ MessageHandler _printMessage(String event) => (Map<String, dynamic> message) {
       return null;
     };
 
-void configureFcm() => _firebaseMessaging.configure(
-      // onBackgroundMessage: _printMessage('onBackgroundMessage'),
-      onLaunch: _printMessage('onLaunch'),
-      onMessage: _printMessage('onMessage'),
-      onResume: _printMessage('onResume'),
-    );
+void configureFcm({
+  MessageHandler onLaunch,
+  MessageHandler onMessage,
+  MessageHandler onResume,
+}) =>
+    _firebaseMessaging
+      ..configure(
+        onLaunch: onLaunch ?? _printMessage('onLaunch'),
+        onMessage: onMessage ?? _printMessage('onMessage'),
+        onResume: onResume ?? _printMessage('onResume'),
+      )
+      ..getToken()
+          .then((t) => debugPrint("For serve.sh:\nexport FCM_TOKEN=$t"));

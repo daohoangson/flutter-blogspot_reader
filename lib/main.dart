@@ -28,7 +28,7 @@ class _SettingState extends State<_Setting> {
   @override
   void initState() {
     super.initState();
-    configureFcm();
+    configureFcm(onLaunch: _fcmOnResume, onResume: _fcmOnResume);
   }
 
   @override
@@ -58,6 +58,19 @@ class _SettingState extends State<_Setting> {
           child: Icon(Icons.add),
         ),
       );
+
+  Future<void> _fcmOnResume(Map<String, dynamic> message) async {
+    if (!message.containsKey('data')) return;
+
+    final data = message['data'] as Map<dynamic, dynamic>;
+    if (!data.containsKey('hubTopic')) return;
+
+    final hubTopic = data['hubTopic'] as String;
+
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => BlogspotFeed(hubTopic)));
+  }
 
   void __actionGo() {
     final input = _tec.text;
