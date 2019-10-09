@@ -2,7 +2,15 @@ import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import * as Parser from 'rss-parser';
 
-import { Config, generateFcmTopicForHubTopic } from '../common/config';
+import {
+  Config,
+  firestoreCollectionSubscriptions,
+  firestoreFieldChallengeDate,
+  firestoreFieldHubTopic,
+  firestoreFieldLeaseEndDate,
+  firestoreFieldLeaseSeconds,
+  generateFcmTopicForHubTopic,
+} from '../common/config';
 import { sha1Hmac } from '../common/crypto';
 
 export const generateTopicMessage = async (hubTopic: string): Promise<admin.messaging.Message> => {
@@ -90,15 +98,32 @@ export default (config: Config) => functions.https.onRequest(async (req, resp) =
   return resp.sendStatus(202);
 });
 
-const _websubChallenge = (req: functions.https.Request, resp: functions.Response) => {
+const _websubChallenge = async (req: functions.https.Request, resp: functions.Response) => {
   const {
     query: {
       'hub.challenge': challenge,
-      'hub.lease_seconds': leaseSeconds,
-      'hub.topic': topic,
+      'hub.lease_seconds': leaseSecondsStr,
+      'hub.topic': hubTopic,
     },
   } = req;
 
-  console.log(`websub.challenge:\n\ttopic=${topic}\n\tchallenge=${challenge}\n\tlease_seconds=${leaseSeconds}`);
+  const leaseSeconds = parseInt(leaseSecondsStr, 10);
+  if (!challenge || leaseSeconds === NaN || leaseSeconds < 1 || !hubTopic) {
+    return resp.sendStatus(400);
+  }
+
+  try {
+    const fcmTopic = generateFcmTopicForHubTopic(hubTopic);
+    await admin.firestore().collection(firestoreCollectionSubscriptions).doc(fcmTopic).set({
+      [firestoreFieldChallengeDate]: admin.firestore.FieldValue.serverTimestamp(),
+      [firestoreFieldHubTopic]: hubTopic,
+      [firestoreFieldLeaseEndDate]: admin.firestore.Timestamp.fromMillis(admin.firestore.Timestamp.now().toMillis() + leaseSeconds * 1000),
+      [firestoreFieldLeaseSeconds]: leaseSeconds,
+    }, { merge: true });
+  } catch (e) {
+    console.error(`websub.challenge: ${JSON.stringify(e)}`);
+    return resp.sendStatus(500);
+  }
+
   return resp.send(challenge)
 }

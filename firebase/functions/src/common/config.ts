@@ -9,6 +9,13 @@ export interface Config {
   getHub(): string;
 }
 
+export const firestoreCollectionSubscriptions = 'subscriptions';
+export const firestoreFieldChallengeDate = 'challenge_date';
+export const firestoreFieldHubTopic = 'hub_topic';
+export const firestoreFieldLeaseEndDate = 'lease_end_date';
+export const firestoreFieldLeaseSeconds = 'lease_seconds';
+export const firestoreFieldSubscribeDate = 'subscribe_date';
+
 export const registrationTokenParamKey = 'br.registration_token';
 
 export const generateFcmTopicForHubTopic = (hubTopic: string): string =>

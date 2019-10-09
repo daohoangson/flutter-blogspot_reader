@@ -2,7 +2,14 @@ import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { post, FullResponse } from 'request-promise-native';
 
-import { Config, generateFcmTopicForHubTopic, registrationTokenParamKey } from '../common/config';
+import {
+  Config,
+  firestoreCollectionSubscriptions,
+  firestoreFieldHubTopic,
+  firestoreFieldSubscribeDate,
+  generateFcmTopicForHubTopic,
+  registrationTokenParamKey,
+} from '../common/config';
 
 export default (config: Config) => functions.https.onRequest(async (req, resp) => {
   const {
@@ -31,6 +38,10 @@ export default (config: Config) => functions.https.onRequest(async (req, resp) =
         resolveWithFullResponse: true,
       }
     ) as Promise<FullResponse>,
+    admin.firestore().collection(firestoreCollectionSubscriptions).doc(fcmTopic).set({
+      [firestoreFieldHubTopic]: hubTopic,
+      [firestoreFieldSubscribeDate]: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true })
   ]).then<number, number>(
     ([fcmResp, hubResp]) => {
       if (fcmResp.successCount !== 1) {
