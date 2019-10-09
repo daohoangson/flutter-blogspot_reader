@@ -5,24 +5,42 @@ import * as Parser from 'rss-parser';
 import { Config, generateFcmTopicForHubTopic } from '../common/config';
 import { sha1Hmac } from '../common/crypto';
 
-export const generatePayloadFromHubTopic = async (hubTopic: string): Promise<admin.messaging.MessagingPayload> => {
-  const parser = new Parser();
+export const generateTopicMessage = async (hubTopic: string): Promise<admin.messaging.Message> => {
+  const parser = new Parser({
+    customFields: {
+      item: [
+        ['media:thumbnail', 'thumbnail']
+      ]
+    }
+  });
   const feed = await parser.parseURL(hubTopic);
-  if (!feed.title) return { data: { hubTopic, debug: '!feed.title' } };
+  const fcmTopic = generateFcmTopicForHubTopic(hubTopic);
+  const debugMessage = (debug: string) => ({ data: { hubTopic, debug }, topic: fcmTopic });
+  if (!feed.title) return debugMessage('!feed.title');
 
-  if (!feed.items) return { data: { hubTopic, debug: '!feed.items' } };
-  if (feed.items.length < 1) return { data: { hubTopic, debug: 'feed.items.length < 1' } };
+  if (!feed.items) return debugMessage('!feed.items');
+  if (feed.items.length < 1) return debugMessage('feed.items.length < 1');
 
   const item = feed.items[0];
-  if (!item.title) return { data: { hubTopic, debug: '!item.title' } };
+  if (!item.title) return debugMessage('!item.title');
+
+  const imageUrl = item.thumbnail && item.thumbnail.$ ?
+    (item.thumbnail.$.url as string).replace(/\/s\d+-c\//, '/') :
+    undefined;
 
   return {
+    topic: fcmTopic,
     notification: {
       title: feed.title,
-      body: `Latest item: ${item.title}`,
-      click_action: 'FLUTTER_NOTIFICATION_CLICK',
+      body: item.title,
     },
     data: { hubTopic },
+    android: {
+      notification: {
+        clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+        imageUrl
+      },
+    },
   };
 }
 
@@ -53,18 +71,17 @@ export default (config: Config) => functions.https.onRequest(async (req, resp) =
     return resp.status(401);
   }
 
-  const fcmTopic = generateFcmTopicForHubTopic(hubTopic);
-  let payload: admin.messaging.MessagingPayload;
+  let message: admin.messaging.Message;
   try {
-    payload = await generatePayloadFromHubTopic(hubTopic);
+    message = await generateTopicMessage(hubTopic);
   } catch (e) {
     console.error(`websub.payload: ${JSON.stringify(e)}`);
     return resp.sendStatus(500);
   }
 
-  console.log(`websub.fcm: topic=${fcmTopic}, payload=${JSON.stringify(payload)}`);
+  console.log(`websub.fcm: message=${JSON.stringify(message)}`);
   try {
-    await admin.messaging().sendToTopic(fcmTopic, payload);
+    await admin.messaging().send(message);
   } catch (e) {
     console.error(`websub.fcm: ${JSON.stringify(e)}`);
     return resp.sendStatus(500);
