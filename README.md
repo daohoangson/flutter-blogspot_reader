@@ -9,7 +9,7 @@ Flutter app with heavy use of Firebase services to read blogs and get notified f
 - [Flutter](https://flutter.dev): cross platform app development. This project only builds iOS and Android apps but Flutter has support for desktop and web apps too. Alternatives: React Native, Xamarin.
   - [flutter_widget_from_html](https://pub.dev/packages/flutter_widget_from_html): render entry html
   - [pull_to_refresh](https://pub.dev/packages/pull_to_refresh): pull-down-to-refresh and pull-up-to-load gestures
-  - [timeago](https://pub.dev/packages/timeago): relative time text (e.g. "5 minutes ago")
+  - [timeago](https://pub.dev/packages/timeago): relative time description (e.g. "5 minutes ago")
   - [webfeed](https://pub.dev/packages/webfeed): Atom feed parser
 - [WebSub](https://www.w3.org/TR/websub/) (previously known as PubSubHubbub): subscription protocol for Blogspot feeds
 - [Firebase Messaging](https://firebase.google.com/docs/cloud-messaging/): push notification solution for iOS, Android and web. Alternative: APNS for iOS. No alternative for Android.
