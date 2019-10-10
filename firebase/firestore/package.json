@@ -1,0 +1,16 @@
+{
+  "name": "firestore",
+  "scripts": {
+    "deploy": "npm test && firebase deploy --only firestore:rules",
+    "emulator": "firebase emulators:start --only firestore",
+    "format": "prettier --write **/*.js",
+    "test": "mocha --timeout=10000"
+  },
+  "private": true,
+  "devDependencies": {
+    "@firebase/testing": "^0.13.4",
+    "filesystem": "^1.0.1",
+    "mocha": "^6.2.1",
+    "prettier": "^1.18.2"
+  }
+}

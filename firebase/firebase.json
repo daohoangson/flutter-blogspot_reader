@@ -1,4 +1,13 @@
 {
+  "emulators": {
+    "firestore": {
+      "port": 8080
+    }
+  },
+  "firestore": {
+    "rules": "firestore/firestore.rules",
+    "indexes": "firestore/firestore.indexes.json"
+  },
   "functions": {
     "ignore": [
       "**/node_modules/**",
@@ -10,6 +19,7 @@
     "predeploy": [
       "npm --prefix \"$RESOURCE_DIR\" run lint",
       "npm --prefix \"$RESOURCE_DIR\" run build"
-    ]
+    ],
+    "source": "functions"
   }
 }
