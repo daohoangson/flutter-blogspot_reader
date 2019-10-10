@@ -1,6 +1,6 @@
 # Blogspot Reader
 
-Flutter app with heavy use of Firebase services to read Blogspot / Blogger blogs and get notified for new posts.
+Flutter app with heavy use of Firebase services to read blogs and get notified for new posts. Only supports Blogger sites.
 
 ## Tech stack
 
