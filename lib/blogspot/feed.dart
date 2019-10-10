@@ -11,10 +11,14 @@ import 'package:blogspot_reader/firebase/firebase.dart';
 
 class BlogspotFeed extends StatefulWidget {
   final String atomFeedUrl;
+  final String domain;
+  final Site site;
   final String title;
 
   BlogspotFeed(
     this.atomFeedUrl, {
+    this.domain,
+    this.site,
     this.title,
   }) : assert(atomFeedUrl != null);
 
@@ -25,6 +29,7 @@ class BlogspotFeed extends StatefulWidget {
 class _BlogspotFeedState extends State<BlogspotFeed> {
   String _atomFeedUrlCanonical;
   final _entries = <AtomItem>[];
+  bool _firestoreSaved = false;
   bool _gridView = false;
   double _gridMaxCrossAxisExtent = 200;
   double _gridSpacing = 5;
@@ -33,6 +38,7 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
   RefreshController _refreshController =
       RefreshController(initialRefresh: true);
   final _scaffoldKey = GlobalKey<ScaffoldState>();
+  Site _site;
   String _title;
 
   @override
@@ -50,7 +56,10 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
                 : SizedBox.shrink(),
             IconButton(
               icon: Icon(_gridView ? Icons.grid_off : Icons.grid_on),
-              onPressed: () => setState(() => _gridView = !_gridView),
+              onPressed: () => setState(() {
+                _gridView = !_gridView;
+                _site?.setGrid(_gridView);
+              }),
             ),
           ],
         ),
@@ -119,6 +128,11 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
       }
     }
 
+    if (!_firestoreSaved) {
+      _firestoreSaved = true;
+      _firestoreSave(atomFeed);
+    }
+
     if (!mounted) return;
     setState(() {
       // workaround to get canonical url for https://pubsubhubbub.appspot.com/
@@ -136,6 +150,22 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
       _entries.addAll(atomFeed.items);
       debugPrint("[$debugTag] _entries=${_entries.length}");
     });
+  }
+
+  void _firestoreSave(AtomFeed atomFeed) async {
+    final uid = await getFirebaseUserId();
+    _site = widget.site ??
+        (widget.domain != null
+            ? (await getUserSiteByDomain(uid, widget.domain) ??
+                Site(
+                  domain: widget.domain,
+                  title: atomFeed.title,
+                  uid: uid,
+                ))
+            : null);
+    _site?.markAsViewed();
+
+    if (_site != null) setState(() => _gridView = _site.isGrid);
   }
 
   Widget _itemBuilder(BuildContext context, int index) {
@@ -180,8 +210,8 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
     );
   }
 
-  void _showSnackbar(Exception e) => _scaffoldKey.currentState
-      .showSnackBar(SnackBar(content: Text(e.toString())));
+  void _showSnackbar(error) => _scaffoldKey.currentState
+      ?.showSnackBar(SnackBar(content: Text("$error")));
 
   Widget __buildThumbnail(Thumbnail thumbnail) => CachedNetworkImage(
         height: double.tryParse(thumbnail.height),

@@ -38,11 +38,12 @@ android {
 
     defaultConfig {
         applicationId "com.daohoangson.blogspot_reader"
-        minSdkVersion 16
+        minSdkVersion 21
+        multiDexEnabled true
         targetSdkVersion 28
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
-        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {

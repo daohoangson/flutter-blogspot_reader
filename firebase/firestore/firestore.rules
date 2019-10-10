@@ -2,7 +2,13 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /subscriptions/{document=**} {
+      // only admin should access subscriptions data
       allow read, write: if false;
+    }
+
+    match /users/{userId}/{document=**} {
+      // user should access their own data only
+      allow read, write: if request.auth.uid == userId
     }
   }
 }

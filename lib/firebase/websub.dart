@@ -23,7 +23,6 @@ class _SubscribeButtonState extends State<SubscribeButton> {
   void __actionSubscribe() async {
     debugPrint("[__actionSubscribe] hubTopic=${widget.hubTopic}");
 
-    // TODO: configure `firebase_messaging` for iOS
     _firebaseMessaging.requestNotificationPermissions();
 
     final token = await _firebaseMessaging.getToken();
