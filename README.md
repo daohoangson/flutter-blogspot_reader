@@ -13,11 +13,12 @@ Flutter app with heavy use of Firebase services to read blogs and get notified f
   - [webfeed](https://pub.dev/packages/webfeed): Atom feed parser
 - [WebSub](https://www.w3.org/TR/websub/) (previously known as PubSubHubbub): subscription protocol for Blogspot feeds
 - [Firebase Messaging](https://firebase.google.com/docs/cloud-messaging/): push notification solution for iOS, Android and web. Alternative: APNS for iOS. No alternative for Android.
-- [Firebase Functions](https://firebase.google.com/docs/functions/): FaaS / serverless platform. Alternative: AWS Lambda, Azure Functions.
+- [Firebase Functions](https://firebase.google.com/docs/functions/): FaaS / serverless platform. Alternatives: AWS Lambda, Azure Functions.
   - [subscribe](/firebase/functions/src/http/subscribe.ts): [subscribe to FCM topic](https://firebase.google.com/docs/cloud-messaging/manage-topics#suscribe_and_unsubscribe_using_the) and start [hub.mode=subscribe](https://www.w3.org/TR/websub/#subscriber-sends-subscription-request) flow
   - [websub](/firebase/functions/src/http/subscribe.ts): implement WebSub protocol [challenge](https://www.w3.org/TR/websub/#hub-verifies-intent) and [callback](https://www.w3.org/TR/websub/#content-distribution) flows
   - [resubscribe](/firebase/functions/src/cron/resubscribe.ts): cron, via [Cloud Scheduler](https://cloud.google.com/scheduler/), to refresh WebSub subscriptions
 - [Cloud Firestore](https://firebase.google.com/docs/firestore): realtime database service
   - [subscriptions](/firebase/firestore/test/subscriptions.test.js) collection: WebSub data
   - [users](/firebase/firestore/test/subscriptions.test.js) collection:
+    - `users/{userId}`: user data (saved anonymously, via [Firebase Auth](https://firebase.google.com/docs/auth/))
     - `users/{userId}/sites`: user sites list
