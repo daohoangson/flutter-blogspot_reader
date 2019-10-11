@@ -59,17 +59,11 @@ class _HomeState extends State<Home> {
     if (input.isNotEmpty != true) return;
     _tec.clear();
 
-    final m = new RegExp(r'^https?://');
-    if (m.matchAsPrefix(input) != null) {
-      Navigator.of(context)
-          .push(MaterialPageRoute(builder: (_) => BlogspotFeed(input)));
-      return;
-    }
-
     Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => BlogspotFeed(
-              "https://$input/feeds/posts/default",
-              domain: input,
+              Uri.tryParse(input)?.scheme?.isNotEmpty == true
+                  ? input
+                  : "https://$input/feeds/posts/default",
             )));
   }
 }

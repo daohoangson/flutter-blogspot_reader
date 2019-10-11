@@ -11,13 +11,11 @@ import 'package:blogspot_reader/firebase/firebase.dart';
 
 class BlogspotFeed extends StatefulWidget {
   final String atomFeedUrl;
-  final String domain;
   final Site site;
   final String title;
 
   BlogspotFeed(
     this.atomFeedUrl, {
-    this.domain,
     this.site,
     this.title,
   }) : assert(atomFeedUrl != null);
@@ -27,12 +25,13 @@ class BlogspotFeed extends StatefulWidget {
 }
 
 class _BlogspotFeedState extends State<BlogspotFeed> {
-  String _atomFeedUrlCanonical;
+  String _domain;
   final _entries = <AtomItem>[];
   bool _firestoreSaved = false;
   bool _gridView = false;
   double _gridMaxCrossAxisExtent = 200;
   double _gridSpacing = 5;
+  String _hubTopic;
   String _nextUrl;
   static int _fetchCount = 0;
   RefreshController _refreshController =
@@ -48,9 +47,9 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
             widget.title ?? _title ?? Uri.parse(widget.atomFeedUrl).host,
           ),
           actions: <Widget>[
-            _atomFeedUrlCanonical != null
+            _hubTopic != null
                 ? SubscribeButton(
-                    hubTopic: _atomFeedUrlCanonical,
+                    hubTopic: _hubTopic,
                     icon: Icons.favorite,
                   )
                 : SizedBox.shrink(),
@@ -111,8 +110,15 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
       return _showSnackbar(e);
     }
 
+    final blogId = atomFeed.id != null
+        ? RegExp(r'tag:blogger\.com,1999:blog-(\d+)$')
+            .matchAsPrefix(atomFeed.id)
+            ?.group(1)
+        : null;
+
     String altUrl, nextUrl;
     for (final link in atomFeed.links) {
+      debugPrint("${link.rel} -> ${link.href}");
       switch (link.rel) {
         case 'alternate':
           altUrl = link.href;
@@ -128,18 +134,14 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
       }
     }
 
-    if (!_firestoreSaved) {
-      _firestoreSaved = true;
-      _firestoreSave(atomFeed);
-    }
-
     if (!mounted) return;
     setState(() {
-      // workaround to get canonical url for https://pubsubhubbub.appspot.com/
-      if (altUrl != null && nextUrl != null) {
+      if (altUrl != null) {
         final altUri = Uri.parse(altUrl);
-        if (altUri.path == '/') {
-          _atomFeedUrlCanonical = "https://${altUri.host}/feeds/posts/default";
+        _domain = altUri.host;
+
+        if (altUri.path == '/' && blogId != null) {
+          _hubTopic = "https://www.blogger.com/feeds/$blogId/posts/default";
         }
       }
 
@@ -150,19 +152,28 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
       _entries.addAll(atomFeed.items);
       debugPrint("[$debugTag] _entries=${_entries.length}");
     });
+
+    if (!_firestoreSaved) {
+      _firestoreSaved = true;
+      _firestoreSave(atomFeed);
+    }
   }
 
   void _firestoreSave(AtomFeed atomFeed) async {
     final uid = await getFirebaseUserId();
+    if (!mounted) return;
+
     _site = widget.site ??
-        (widget.domain != null
-            ? (await getUserSiteByDomain(uid, widget.domain) ??
+        (_domain != null
+            ? (await getUserSiteByDomain(uid, _domain) ??
                 Site(
-                  domain: widget.domain,
+                  domain: _domain,
                   title: atomFeed.title,
                   uid: uid,
                 ))
             : null);
+    if (!mounted) return;
+
     _site?.markAsViewed();
 
     if (_site != null) setState(() => _gridView = _site.isGrid);

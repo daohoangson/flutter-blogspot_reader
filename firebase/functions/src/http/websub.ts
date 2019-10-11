@@ -13,7 +13,7 @@ import {
 } from '../common/config';
 import { sha1Hmac } from '../common/crypto';
 
-export const generateTopicMessage = async (hubTopic: string): Promise<admin.messaging.Message> => {
+export const generateTopicMessage = async (hubTopic: string, xml: string): Promise<admin.messaging.Message> => {
   const parser = new Parser({
     customFields: {
       item: [
@@ -21,15 +21,15 @@ export const generateTopicMessage = async (hubTopic: string): Promise<admin.mess
       ]
     }
   });
-  const feed = await parser.parseURL(hubTopic);
+  const feed = await parser.parseString(xml);
   const fcmTopic = generateFcmTopicForHubTopic(hubTopic);
   const debugMessage = (debug: string) => ({ data: { hubTopic, debug }, topic: fcmTopic });
   if (!feed.title) return debugMessage('!feed.title');
+  const { title } = feed;
 
-  if (!feed.items) return debugMessage('!feed.items');
-  if (feed.items.length < 1) return debugMessage('feed.items.length < 1');
-
+  if (!feed.items || feed.items.length < 1) return debugMessage('feed.items.length < 1');
   const item = feed.items[0];
+
   if (!item.title) return debugMessage('!item.title');
 
   const imageUrl = item.thumbnail && item.thumbnail.$ ?
@@ -39,10 +39,10 @@ export const generateTopicMessage = async (hubTopic: string): Promise<admin.mess
   return {
     topic: fcmTopic,
     notification: {
-      title: feed.title,
+      title,
       body: item.title,
     },
-    data: { hubTopic },
+    data: { hubTopic, title },
     android: {
       notification: {
         clickAction: 'FLUTTER_NOTIFICATION_CLICK',
@@ -81,7 +81,7 @@ export default (config: Config) => functions.https.onRequest(async (req, resp) =
 
   let message: admin.messaging.Message;
   try {
-    message = await generateTopicMessage(hubTopic);
+    message = await generateTopicMessage(hubTopic, body);
   } catch (e) {
     console.exception(e);
     return resp.sendStatus(500);
