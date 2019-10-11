@@ -19,6 +19,5 @@ Flutter app with heavy use of Firebase services to read blogs and get notified f
   - `resubscribe`: cron, via [Cloud Scheduler](https://cloud.google.com/scheduler/), to refresh WebSub subscriptions
 - [Cloud Firestore](https://firebase.google.com/docs/firestore): realtime database service
   - `subscriptions` collection: WebSub data
-  - `users` collection:
-    - `users/{userId}`: user data (saved anonymously, via [Firebase Auth](https://firebase.google.com/docs/auth/))
-    - `users/{userId}/sites`: user sites list
+  - `users` collection: user data (saved anonymously, via [Firebase Auth](https://firebase.google.com/docs/auth/))
+    - `users/{userId}/sites`: sites list
