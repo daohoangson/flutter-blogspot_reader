@@ -191,8 +191,8 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
     final entry = _entries[index];
 
     final thumbnail = entry.media.thumbnails.isNotEmpty
-        ? __buildThumbnailSquare(
-            entry.media.thumbnails.first, _gridMaxCrossAxisExtent.toInt())
+        ? __buildThumbnailSquare(entry.media.thumbnails.first,
+            _gridMaxCrossAxisExtent * MediaQuery.of(context).devicePixelRatio)
         : null;
 
     return GestureDetector(
@@ -219,13 +219,16 @@ class _BlogspotFeedState extends State<BlogspotFeed> {
         width: double.tryParse(thumbnail.width),
       );
 
-  Widget __buildThumbnailSquare(Thumbnail thumbnail, int size) {
+  Widget __buildThumbnailSquare(Thumbnail thumbnail, num size) {
     final height = int.tryParse(thumbnail.height);
     final width = int.tryParse(thumbnail.width);
     if (height == null || width == null || height != width) return null;
 
     // workaround to generate thumbnail in specified size
-    final sizeUrl = thumbnail.url.replaceAll("s$height-c", "s$size-c");
+    final sizeUrl = thumbnail.url.replaceAll(
+      "s$height-c",
+      "s${size.toInt()}-c",
+    );
     if (sizeUrl == thumbnail.url) return null;
 
     return AspectRatio(
