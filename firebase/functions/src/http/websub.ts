@@ -83,7 +83,7 @@ export default (config: Config) => functions.https.onRequest(async (req, resp) =
   try {
     message = await generateTopicMessage(hubTopic);
   } catch (e) {
-    console.error(`websub.payload: ${JSON.stringify(e)}`);
+    console.exception(e);
     return resp.sendStatus(500);
   }
 
@@ -91,7 +91,7 @@ export default (config: Config) => functions.https.onRequest(async (req, resp) =
   try {
     await admin.messaging().send(message);
   } catch (e) {
-    console.error(`websub.fcm: ${JSON.stringify(e)}`);
+    console.exception(e);
     return resp.sendStatus(500);
   }
 
@@ -121,7 +121,7 @@ const _websubChallenge = async (req: functions.https.Request, resp: functions.Re
       [firestoreFieldLeaseSeconds]: leaseSeconds,
     }, { merge: true });
   } catch (e) {
-    console.error(`websub.challenge: ${JSON.stringify(e)}`);
+    console.exception(e);
     return resp.sendStatus(500);
   }
 

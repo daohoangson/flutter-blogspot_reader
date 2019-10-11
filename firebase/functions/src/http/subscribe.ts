@@ -61,7 +61,7 @@ export default (config: Config) => functions.https.onRequest(async (req, resp) =
       return 202;
     },
     (reason) => {
-      console.error(`subscribe[${registrationToken}]: ${JSON.stringify(reason)}`);
+      console.exception(reason);
       return 500;
     },
   );

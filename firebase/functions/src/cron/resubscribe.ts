@@ -42,7 +42,7 @@ export default (config: Config) => functions.pubsub.schedule('every 2 hours').on
           console.log(`resubscribe[${hubTopic}]:\n\thubSubscribeUrl=${hubSubscribeUrl}\n\twebsubCallback=${websubCallback}\n\thubTopic=${hubTopic}`);
         }
       },
-      (reason) => console.error(`resubscribe[${hubTopic}]: ${JSON.stringify(reason)}`)
+      (reason) => console.exception(reason)
     );
   }));
 });
