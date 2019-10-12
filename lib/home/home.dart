@@ -42,16 +42,18 @@ class _HomeState extends State<Home> {
       );
 
   Future<void> _fcmOnResume(Map<String, dynamic> message) async {
+    debugPrint("_fcmOnResume: $message");
     if (!message.containsKey('data')) return;
 
     final data = message['data'] as Map<dynamic, dynamic>;
     if (!data.containsKey('hubTopic')) return;
 
-    final hubTopic = data['hubTopic'] as String;
-
     Navigator.of(context).popUntil((route) => route.isFirst);
-    Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => BlogspotFeed(hubTopic)));
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => BlogspotFeed(
+              data['hubTopic'],
+              title: data.containsKey('site.title') ? data['site.title'] : null,
+            )));
   }
 
   void __actionGo() {
