@@ -59,6 +59,16 @@ export const generateTopicMessage = async (hubTopic: string, xml: string): Promi
         tag: fcmTopic,
       },
     },
+    apns: imageUrl ? {
+      fcmOptions: {
+        imageUrl,
+      },
+      payload: {
+        aps: {
+          mutableContent: true,
+        },
+      },
+    } : undefined,
   };
 }
 

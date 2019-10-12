@@ -30,13 +30,25 @@ describe('generateTopicMessage', () => {
     });
   });
 
-  it('should return message with Android imageUrl', async () => {
-    const imageUrl = 'http://domain.com/image.jpg';
-    const xmlEntryThumbnail = `<media:thumbnail url="${imageUrl}" />`;
-    const xml = fullXml.replace('</entry>', xmlEntryThumbnail + '</entry>');
-    const result = await generateTopicMessage('', xml);
-    expect(result.android!.notification!.imageUrl).to.equal(imageUrl);
-  });
+  describe('imageUrl', () => {
+    it('should work without thumbnail', async () => {
+      const xml = fullXml;
+      const result = await generateTopicMessage('', xml);
+      expect(result.android!.notification!.imageUrl).to.be.undefined;
+      expect(result.apns).to.be.undefined;
+    });
+
+    it('should work with thumbnail', async () => {
+      const imageUrl = 'http://domain.com/image.jpg';
+      const xmlEntryThumbnail = `<media:thumbnail url="${imageUrl}" />`;
+      const xml = fullXml.replace('</entry>', xmlEntryThumbnail + '</entry>');
+      const result = await generateTopicMessage('', xml);
+      expect(result.android!.notification!.imageUrl).to.equal(imageUrl);
+      expect(result.apns!.fcmOptions!.imageUrl).to.equal(imageUrl);
+      expect(result.apns!.payload!.aps.mutableContent).to.be.true;
+    });
+  })
+
 
   describe('error handling', () => {
     it('should handle missing feed title', async () => {
