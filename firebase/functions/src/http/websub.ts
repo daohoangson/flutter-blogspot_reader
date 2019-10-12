@@ -7,13 +7,15 @@ import {
   firestoreCollectionSubscriptions,
   firestoreFieldChallengeDate,
   firestoreFieldHubTopic,
+  firestoreFieldLatestItemDate,
   firestoreFieldLeaseEndDate,
   firestoreFieldLeaseSeconds,
   generateFcmTopicForHubTopic,
+  hubTopicPrefix,
 } from '../common/config';
 import { sha1Hmac } from '../common/crypto';
 
-export const generateTopicMessage = async (hubTopic: string): Promise<admin.messaging.Message> => {
+export const generateTopicMessage = async (hubTopic: string, xml: string): Promise<admin.messaging.Message> => {
   const parser = new Parser({
     customFields: {
       item: [
@@ -21,15 +23,17 @@ export const generateTopicMessage = async (hubTopic: string): Promise<admin.mess
       ]
     }
   });
-  const feed = await parser.parseURL(hubTopic);
+  const feed = await parser.parseString(xml);
   const fcmTopic = generateFcmTopicForHubTopic(hubTopic);
   const debugMessage = (debug: string) => ({ data: { hubTopic, debug }, topic: fcmTopic });
   if (!feed.title) return debugMessage('!feed.title');
+  const { title } = feed;
 
-  if (!feed.items) return debugMessage('!feed.items');
-  if (feed.items.length < 1) return debugMessage('feed.items.length < 1');
-
+  if (!feed.items || feed.items.length < 1) return debugMessage('feed.items.length < 1');
   const item = feed.items[0];
+
+  if (!item.isoDate) return debugMessage('!item.date');
+  if (!item.link) return debugMessage('!item.link');
   if (!item.title) return debugMessage('!item.title');
 
   const imageUrl = item.thumbnail && item.thumbnail.$ ?
@@ -39,16 +43,32 @@ export const generateTopicMessage = async (hubTopic: string): Promise<admin.mess
   return {
     topic: fcmTopic,
     notification: {
-      title: feed.title,
+      title,
       body: item.title,
     },
-    data: { hubTopic },
+    data: {
+      hubTopic,
+      'item.date': Date.parse(item.isoDate).toString(),
+      'item.link': item.link,
+      'site.title': title,
+    },
     android: {
       notification: {
         clickAction: 'FLUTTER_NOTIFICATION_CLICK',
-        imageUrl
+        imageUrl,
+        tag: fcmTopic,
       },
     },
+    apns: imageUrl ? {
+      fcmOptions: {
+        imageUrl,
+      },
+      payload: {
+        aps: {
+          mutableContent: true,
+        },
+      },
+    } : undefined,
   };
 }
 
@@ -67,10 +87,15 @@ export default (config: Config) => functions.https.onRequest(async (req, resp) =
   const linkMatches = typeof link === 'string' ? RegExp('<([^>]+)>; rel=self').exec(link) : null;
   if (linkMatches === null) {
     console.error(`websub.callback: invalid link=${link}`);
-    return resp.sendStatus(500);
+    return resp.sendStatus(400);
   }
 
   const hubTopic = linkMatches[1];
+  if (!hubTopic.startsWith(hubTopicPrefix)) {
+    console.warn(`websub.hubTopic: invalid ${hubTopic}`);
+    return resp.sendStatus(400);
+  }
+
   const secret = config.generateWebsubSecretForHubTopic(hubTopic);
   const body = rawBody.toString();
   const bodySha1Hmac = sha1Hmac(body, secret);
@@ -81,22 +106,58 @@ export default (config: Config) => functions.https.onRequest(async (req, resp) =
 
   let message: admin.messaging.Message;
   try {
-    message = await generateTopicMessage(hubTopic);
+    message = await generateTopicMessage(hubTopic, body);
   } catch (e) {
-    console.error(`websub.payload: ${JSON.stringify(e)}`);
+    console.exception(e);
     return resp.sendStatus(500);
   }
 
-  console.log(`websub.fcm: message=${JSON.stringify(message)}`);
-  try {
-    await admin.messaging().send(message);
-  } catch (e) {
-    console.error(`websub.fcm: ${JSON.stringify(e)}`);
+  const { 'item.date': itemDateStr } = message.data!;
+  if (!itemDateStr) {
+    console.error(`websub.message: no \`item.date\` ${JSON.stringify(message)}`);
     return resp.sendStatus(500);
   }
+  const itemDate = parseInt(itemDateStr, 10);
+
+  const fcmTopic = (message as any).topic as string;
+  let subscription: FirebaseFirestore.DocumentSnapshot;
+  try {
+    subscription = await _getSubscriptionDocRef(fcmTopic).get()
+  } catch (e) {
+    console.exception(e);
+    return resp.sendStatus(500);
+  }
+  const subscriptionData = subscription.data();
+  if (!subscriptionData) {
+    console.error('websub.firestore: subscription data is undefined');
+    return resp.sendStatus(500);
+  }
+
+  const latestItemDate = subscriptionData[firestoreFieldLatestItemDate] as admin.firestore.Timestamp | undefined;
+  const itemDateTimestamp = admin.firestore.Timestamp.fromMillis(itemDate);
+  if (latestItemDate && latestItemDate.toMillis() >= itemDate) {
+    console.warn(`websub.firestore: skipped ${firestoreFieldLatestItemDate}=${latestItemDate.toDate()}, item.date=${itemDateTimestamp.toDate()}`);
+    return resp.sendStatus(202);
+  }
+
+  try {
+    await Promise.all([
+      admin.messaging().send(message),
+      _getSubscriptionDocRef(fcmTopic)
+        .update({ [firestoreFieldLatestItemDate]: itemDateTimestamp })
+    ]);
+  } catch (e) {
+    console.exception(e);
+    return resp.sendStatus(500);
+  }
+
+  console.log(`websub.fcm: sent ${JSON.stringify(message)}`);
 
   return resp.sendStatus(202);
 });
+
+const _getSubscriptionDocRef = (fcmTopic: string): FirebaseFirestore.DocumentReference =>
+  admin.firestore().collection(firestoreCollectionSubscriptions).doc(fcmTopic);
 
 const _websubChallenge = async (req: functions.https.Request, resp: functions.Response) => {
   const {
@@ -121,7 +182,7 @@ const _websubChallenge = async (req: functions.https.Request, resp: functions.Re
       [firestoreFieldLeaseSeconds]: leaseSeconds,
     }, { merge: true });
   } catch (e) {
-    console.error(`websub.challenge: ${JSON.stringify(e)}`);
+    console.exception(e);
     return resp.sendStatus(500);
   }
 

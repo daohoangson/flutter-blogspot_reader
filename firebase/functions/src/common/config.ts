@@ -12,9 +12,12 @@ export interface Config {
 export const firestoreCollectionSubscriptions = 'subscriptions';
 export const firestoreFieldChallengeDate = 'challenge_date';
 export const firestoreFieldHubTopic = 'hub_topic';
+export const firestoreFieldLatestItemDate = 'latest_item_date';
 export const firestoreFieldLeaseEndDate = 'lease_end_date';
 export const firestoreFieldLeaseSeconds = 'lease_seconds';
 export const firestoreFieldSubscribeDate = 'subscribe_date';
+
+export const hubTopicPrefix = 'https://www.blogger.com';
 
 export const registrationTokenParamKey = 'br.registration_token';
 

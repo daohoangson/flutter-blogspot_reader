@@ -7,6 +7,7 @@ import {
   firestoreCollectionSubscriptions,
   firestoreFieldHubTopic,
   firestoreFieldLeaseEndDate,
+  hubTopicPrefix,
 } from '../common/config';
 
 export default (config: Config) => functions.pubsub.schedule('every 2 hours').onRun(async (_) => {
@@ -20,6 +21,13 @@ export default (config: Config) => functions.pubsub.schedule('every 2 hours').on
     const subscription = doc.data();
 
     const hubTopic = subscription[firestoreFieldHubTopic];
+    if (!hubTopic.startsWith(hubTopicPrefix)) {
+      return doc.ref.delete().then(
+        (__) => console.warn(`resubscribe[${hubTopic}]: deleted`),
+        (reason) => console.exception(reason)
+      );
+    }
+
     const hubSubscribeUrl = `${config.getHub()}/subscribe`;
     const websubCallback = config.generateWebsubCallbackForHubTopic(hubTopic);
 
@@ -42,7 +50,7 @@ export default (config: Config) => functions.pubsub.schedule('every 2 hours').on
           console.log(`resubscribe[${hubTopic}]:\n\thubSubscribeUrl=${hubSubscribeUrl}\n\twebsubCallback=${websubCallback}\n\thubTopic=${hubTopic}`);
         }
       },
-      (reason) => console.error(`resubscribe[${hubTopic}]: ${JSON.stringify(reason)}`)
+      (reason) => console.exception(reason)
     );
   }));
 });
