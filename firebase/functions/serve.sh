@@ -26,7 +26,7 @@ echo "WEBSUB_URL=${WEBSUB_URL}"
 
 if [ ! -z "$FCM_TOKEN" ]; then
   echo 'Posible tests:'
-  echo "curl -v ${NGROK_URL}/${_projectId}/${_region}/subscribe?hub.topic=https://geek.daohoangson.com/feeds/posts/default&br.registration_token=${FCM_TOKEN}"
+  echo "curl -v ${NGROK_URL}/${_projectId}/${_region}/subscribe?hub.topic=https://www.blogger.com/feeds/6811771432016260177/posts/default&br.registration_token=${FCM_TOKEN}"
 fi
 
 exec npm run serve

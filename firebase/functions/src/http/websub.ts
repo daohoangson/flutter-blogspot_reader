@@ -7,9 +7,11 @@ import {
   firestoreCollectionSubscriptions,
   firestoreFieldChallengeDate,
   firestoreFieldHubTopic,
+  firestoreFieldLatestItemDate,
   firestoreFieldLeaseEndDate,
   firestoreFieldLeaseSeconds,
   generateFcmTopicForHubTopic,
+  hubTopicPrefix,
 } from '../common/config';
 import { sha1Hmac } from '../common/crypto';
 
@@ -30,6 +32,8 @@ export const generateTopicMessage = async (hubTopic: string, xml: string): Promi
   if (!feed.items || feed.items.length < 1) return debugMessage('feed.items.length < 1');
   const item = feed.items[0];
 
+  if (!item.isoDate) return debugMessage('!item.date');
+  if (!item.link) return debugMessage('!item.link');
   if (!item.title) return debugMessage('!item.title');
 
   const imageUrl = item.thumbnail && item.thumbnail.$ ?
@@ -42,11 +46,17 @@ export const generateTopicMessage = async (hubTopic: string, xml: string): Promi
       title,
       body: item.title,
     },
-    data: { hubTopic, title },
+    data: {
+      hubTopic,
+      'item.date': Date.parse(item.isoDate).toString(),
+      'item.link': item.link,
+      'site.title': title,
+    },
     android: {
       notification: {
         clickAction: 'FLUTTER_NOTIFICATION_CLICK',
-        imageUrl
+        imageUrl,
+        tag: fcmTopic,
       },
     },
   };
@@ -67,10 +77,15 @@ export default (config: Config) => functions.https.onRequest(async (req, resp) =
   const linkMatches = typeof link === 'string' ? RegExp('<([^>]+)>; rel=self').exec(link) : null;
   if (linkMatches === null) {
     console.error(`websub.callback: invalid link=${link}`);
-    return resp.sendStatus(500);
+    return resp.sendStatus(400);
   }
 
   const hubTopic = linkMatches[1];
+  if (!hubTopic.startsWith(hubTopicPrefix)) {
+    console.warn(`websub.hubTopic: invalid ${hubTopic}`);
+    return resp.sendStatus(400);
+  }
+
   const secret = config.generateWebsubSecretForHubTopic(hubTopic);
   const body = rawBody.toString();
   const bodySha1Hmac = sha1Hmac(body, secret);
@@ -87,16 +102,52 @@ export default (config: Config) => functions.https.onRequest(async (req, resp) =
     return resp.sendStatus(500);
   }
 
-  console.log(`websub.fcm: message=${JSON.stringify(message)}`);
+  const { 'item.date': itemDateStr } = message.data!;
+  if (!itemDateStr) {
+    console.error(`websub.message: no \`item.date\` ${JSON.stringify(message)}`);
+    return resp.sendStatus(500);
+  }
+  const itemDate = parseInt(itemDateStr, 10);
+
+  const fcmTopic = (message as any).topic as string;
+  let subscription: FirebaseFirestore.DocumentSnapshot;
   try {
-    await admin.messaging().send(message);
+    subscription = await _getSubscriptionDocRef(fcmTopic).get()
+  } catch (e) {
+    console.exception(e);
+    return resp.sendStatus(500);
+  }
+  const subscriptionData = subscription.data();
+  if (!subscriptionData) {
+    console.error('websub.firestore: subscription data is undefined');
+    return resp.sendStatus(500);
+  }
+
+  const latestItemDate = subscriptionData[firestoreFieldLatestItemDate] as admin.firestore.Timestamp | undefined;
+  const itemDateTimestamp = admin.firestore.Timestamp.fromMillis(itemDate);
+  if (latestItemDate && latestItemDate.toMillis() >= itemDate) {
+    console.warn(`websub.firestore: skipped ${firestoreFieldLatestItemDate}=${latestItemDate.toDate()}, item.date=${itemDateTimestamp.toDate()}`);
+    return resp.sendStatus(202);
+  }
+
+  try {
+    await Promise.all([
+      admin.messaging().send(message),
+      _getSubscriptionDocRef(fcmTopic)
+        .update({ [firestoreFieldLatestItemDate]: itemDateTimestamp })
+    ]);
   } catch (e) {
     console.exception(e);
     return resp.sendStatus(500);
   }
 
+  console.log(`websub.fcm: sent ${JSON.stringify(message)}`);
+
   return resp.sendStatus(202);
 });
+
+const _getSubscriptionDocRef = (fcmTopic: string): FirebaseFirestore.DocumentReference =>
+  admin.firestore().collection(firestoreCollectionSubscriptions).doc(fcmTopic);
 
 const _websubChallenge = async (req: functions.https.Request, resp: functions.Response) => {
   const {

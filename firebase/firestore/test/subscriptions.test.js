@@ -6,8 +6,8 @@ const rules = fs.readFileSync("firestore.rules", "utf8");
 
 const _ = auth => firebase.initializeTestApp({ projectId, auth }).firestore();
 
-beforeEach(() => firebase.clearFirestoreData({ projectId: projectId }));
-before(() => firebase.loadFirestoreRules({ projectId: projectId, rules }));
+beforeEach(() => firebase.clearFirestoreData({ projectId }));
+before(() => firebase.loadFirestoreRules({ projectId, rules }));
 after(() => Promise.all(firebase.apps().map(app => app.delete())));
 
 describe("subscriptions", () => {

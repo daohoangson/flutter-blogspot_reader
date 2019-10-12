@@ -8,6 +8,7 @@ import {
   firestoreFieldHubTopic,
   firestoreFieldSubscribeDate,
   generateFcmTopicForHubTopic,
+  hubTopicPrefix,
   registrationTokenParamKey,
 } from '../common/config';
 
@@ -20,6 +21,10 @@ export default (config: Config) => functions.https.onRequest(async (req, resp) =
   } = req;
 
   if (!hubTopic || !registrationToken) return resp.sendStatus(400);
+  if (!hubTopic.startsWith(hubTopicPrefix)) {
+    console.warn(`subscribe.hubTopic: invalid ${hubTopic}`);
+    return resp.sendStatus(400);
+  }
 
   const fcmTopic = generateFcmTopicForHubTopic(hubTopic);
   const hubSubscribeUrl = `${config.getHub()}/subscribe`;
