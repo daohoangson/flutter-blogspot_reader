@@ -82,18 +82,23 @@ export default (config: Config) => functions.https.onRequest(async (req, resp) =
     rawBody,
   } = req;
 
-  if (method !== 'POST' || !signature || !rawBody) return _websubChallenge(req, resp);
+  if (method !== 'POST' || !signature || !rawBody) {
+    _websubChallenge(req, resp);
+    return;
+  }
 
   const linkMatches = typeof link === 'string' ? RegExp('<([^>]+)>; rel=self').exec(link) : null;
   if (linkMatches === null) {
     console.error(`websub.callback: invalid link=${link}`);
-    return resp.sendStatus(400);
+    resp.sendStatus(400);
+    return;
   }
 
   const hubTopic = linkMatches[1];
   if (!hubTopic.startsWith(hubTopicPrefix)) {
     console.warn(`websub.hubTopic: invalid ${hubTopic}`);
-    return resp.sendStatus(400);
+    resp.sendStatus(400);
+    return;
   }
 
   const secret = config.generateWebsubSecretForHubTopic(hubTopic);
@@ -101,7 +106,8 @@ export default (config: Config) => functions.https.onRequest(async (req, resp) =
   const bodySha1Hmac = sha1Hmac(body, secret);
   if (signature !== `sha1=${bodySha1Hmac}`) {
     console.error(`websub.callback:\n\thubTopic=${hubTopic}\n\tsignature=${signature}\n\tbodySha1Hmac=${bodySha1Hmac}`);
-    return resp.status(401);
+    resp.status(401);
+    return;
   }
 
   let message: admin.messaging.Message;
@@ -109,13 +115,15 @@ export default (config: Config) => functions.https.onRequest(async (req, resp) =
     message = await generateTopicMessage(hubTopic, body);
   } catch (e) {
     console.exception(e);
-    return resp.sendStatus(500);
+    resp.sendStatus(500);
+    return;
   }
 
   const { 'item.date': itemDateStr } = message.data!;
   if (!itemDateStr) {
     console.error(`websub.message: no \`item.date\` ${JSON.stringify(message)}`);
-    return resp.sendStatus(500);
+    resp.sendStatus(500);
+    return;
   }
   const itemDate = parseInt(itemDateStr, 10);
 
@@ -125,19 +133,22 @@ export default (config: Config) => functions.https.onRequest(async (req, resp) =
     subscription = await _getSubscriptionDocRef(fcmTopic).get()
   } catch (e) {
     console.exception(e);
-    return resp.sendStatus(500);
+    resp.sendStatus(500);
+    return;
   }
   const subscriptionData = subscription.data();
   if (!subscriptionData) {
     console.error('websub.firestore: subscription data is undefined');
-    return resp.sendStatus(500);
+    resp.sendStatus(500);
+    return;
   }
 
   const latestItemDate = subscriptionData[firestoreFieldLatestItemDate] as admin.firestore.Timestamp | undefined;
   const itemDateTimestamp = admin.firestore.Timestamp.fromMillis(itemDate);
   if (latestItemDate && latestItemDate.toMillis() >= itemDate) {
     console.warn(`websub.firestore: skipped ${firestoreFieldLatestItemDate}=${latestItemDate.toDate()}, item.date=${itemDateTimestamp.toDate()}`);
-    return resp.sendStatus(202);
+    resp.sendStatus(202);
+    return;
   }
 
   try {
@@ -148,12 +159,12 @@ export default (config: Config) => functions.https.onRequest(async (req, resp) =
     ]);
   } catch (e) {
     console.exception(e);
-    return resp.sendStatus(500);
+    resp.sendStatus(500);
+    return;
   }
 
   console.log(`websub.fcm: sent ${JSON.stringify(message)}`);
-
-  return resp.sendStatus(202);
+  resp.sendStatus(202);
 });
 
 const _getSubscriptionDocRef = (fcmTopic: string): FirebaseFirestore.DocumentReference =>
@@ -163,12 +174,13 @@ const _websubChallenge = async (req: functions.https.Request, resp: functions.Re
   const {
     query: {
       'hub.challenge': challenge,
-      'hub.lease_seconds': leaseSecondsStr,
-      'hub.topic': hubTopic,
+      'hub.lease_seconds': _leaseSeconds,
+      'hub.topic': _hubTopic,
     },
   } = req;
 
-  const leaseSeconds = parseInt(leaseSecondsStr, 10);
+  const leaseSeconds = typeof _leaseSeconds === 'string' ? parseInt(_leaseSeconds, 10) : 0;
+  const hubTopic = typeof _hubTopic === 'string' ? _hubTopic : '';
   if (!challenge || leaseSeconds === NaN || leaseSeconds < 1 || !hubTopic) {
     return resp.sendStatus(400);
   }
